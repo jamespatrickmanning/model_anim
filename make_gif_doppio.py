@@ -91,7 +91,7 @@ def plotit(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,area='OOI'
     plt.clabel(dept_cs, inline = True, fontsize =15,fmt="%1.0f")
     
     
-    clevs=np.arange(40.,48.,0.5)  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
+    clevs=np.arange(39.,47.,0.5)  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
     cs = m.contourf(x,y,temp,clevs,cmap=plt.get_cmap('rainbow'))
     # add colorbar.
     cbar = m.colorbar(cs,location='right',pad="2%",size="5%")
@@ -102,10 +102,11 @@ def plotit(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,area='OOI'
     if not os.path.exists(path_save):
         os.makedirs(path_save)
     plt.savefig(os.path.join(path_save,time_str.replace(' ','t')+'.png'),dpi=dpi)
+
 def mean_temp(temps):
     mean_temp=temps[0,0]
     for i in range(1,24):
-        mean_temp+=temps[i,0]
+        mean_temp+=temps[i,0]# note we are using the bottom level 0
     return mean_temp/24.0
         
 def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
@@ -116,8 +117,10 @@ def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
     '''
     with open(dpath,'rb') as fp:
          telemetered_dict=pickle.load(fp)
+    interval=interval*24
     for j in range(interval):
-        dtime=dt+timedelta(days=j)
+        #dtime=dt+timedelta(days=j)
+        dtime=dt+timedelta(hours=j)
         print(dtime)
         url=get_doppio_url(dtime)
         while True:
@@ -146,9 +149,11 @@ def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
         if skip==1:
             continue
                 
-        m_temp=mean_temp(temps)
+        #m_temp=mean_temp(temps)# here we are taking a daily average
+        m_temp=temps[np.mod(j,24),0]
         ntime=dtime
-        time_str=ntime.strftime('%Y-%m-%d')
+        #time_str=ntime.strftime('%Y-%m-%d')
+        time_str=ntime.strftime('%Y-%m-%d-%H')
         temp=m_temp*1.8+32
         Year=str(ntime.year)
         Month=str(ntime.month)
@@ -240,8 +245,8 @@ def make_gif(gif_name,png_dir,start_time=False,end_time=False,frame_length = 0.2
 #def main():  
 #hardcodes in this function!!!!!!!!!!!!
 area='NorthShore'
-start_date='2020-02-10'
-ndays=3 # number of days to run
+start_date='2020-02-14'
+ndays=5 # number of days to run
 #########
 start_date_datetime=datetime(int(start_date[0:4]),int(start_date[5:7]),int(start_date[8:10]),0,0,0)
 end_date_datetime=datetime(int(start_date[0:4]),int(start_date[5:7]),int(start_date[8:10]),0,0,0)+timedelta(days=ndays)

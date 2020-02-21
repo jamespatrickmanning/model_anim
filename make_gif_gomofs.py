@@ -74,12 +74,15 @@ def get_gomofs_url(date):
     +date_str[:6]+'/nos.gomofs.fields.'+nstr+'.'+date_str[:8]+'.'+tstr+'.nc'
     return url
 
-def plot(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,gbox=[-71., -65.,40,42.5]):
+def plotit(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,area='OOI'):
     fig = plt.figure(figsize=(12,9))
     ax = fig.add_axes([0.01,0.05,0.98,0.87])
     # create polar stereographic Basemap instance.
-    m = Basemap(projection='stere',lon_0=-67,lat_0=42,lat_ts=0,llcrnrlat=38,urcrnrlat=46,\
-                llcrnrlon=-73,urcrnrlon=-61,rsphere=6371200.,resolution='i',area_thresh=100)
+    gb=getgbox(area)
+    m = Basemap(projection='stere',lon_0=(gb[0]+gb[1])/2.,lat_0=(gb[2]+gb[3])/2.,lat_ts=0,llcrnrlat=gb[2],urcrnrlat=gb[3],\
+                llcrnrlon=gb[0],urcrnrlon=gb[1],rsphere=6371200.,resolution='f',area_thresh=100)
+#    m = Basemap(projection='stere',lon_0=-67,lat_0=42,lat_ts=0,llcrnrlat=38,urcrnrlat=46,\
+#                llcrnrlon=-73,urcrnrlon=-61,rsphere=6371200.,resolution='i',area_thresh=100)
     # draw coastlines, state and country boundaries, edge of map.
     m.drawcoastlines()
     m.drawstates()
@@ -88,35 +91,39 @@ def plot(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,gbox=[-71., 
         x1,y1=m(slons,slats)
         ax.plot(x1,y1,'ro',markersize=10)
     # draw parallels.
-    parallels = np.arange(0.,90,2.)
+    parallels = np.arange(0.,90,1.)
     m.drawparallels(parallels,labels=[1,0,0,0],fontsize=20)
     # draw meridians
-    meridians = np.arange(180.,360.,2.)
+    meridians = np.arange(180.,360.,1.)
     m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=20)
     x, y = m(lons, lats) # compute map proj coordinates.
     # draw filled contours.
     
     
-    dept_clevs=[50,150,300,1000,2000]
+    dept_clevs=[50,100, 150,300,1000]
     dept_cs=m.contour(x,y,depth,dept_clevs,colors='black')
     plt.clabel(dept_cs, inline = True, fontsize =15,fmt="%1.0f")
     
     
-    clevs=np.arange(34,57.5,0.5)  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
+    clevs=np.arange(39,47,0.5)  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
     cs = m.contourf(x,y,temp,clevs,cmap=plt.get_cmap('rainbow'))
-    plt.xlim([gbox[0],gbox[1]])
-    plt.ylim([gbox[2],gbox[3]])
+    #plt.xlim([gbox[0],gbox[1]])
+    #plt.ylim([gbox[2],gbox[3]])
     # add colorbar.
     cbar = m.colorbar(cs,location='right',pad="2%",size="5%")
     cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=20)
     cbar.set_label('Fahrenheit',fontsize=25)
     # add title
-    plt.title('GoMOFs MODEL BOTTOM TEMPERATURE '+time_str,fontsize=30)
+    plt.title('GoMOFS MODEL BOTTOM TEMP '+time_str,fontsize=30)
     if not os.path.exists(path_save):
         os.makedirs(path_save)
+    #print(time_str)
+    #print(os.path.join(path_save,time_str.replace(' ','t')+'.png'))
+    #plt.show()
     plt.savefig(os.path.join(path_save,time_str.replace(' ','t')+'.png'),dpi=dpi)
 
-def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,gbox=[-71., -65.,40,42.5]):
+def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
+#def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),area='OOI'):
     '''dpath: the path of dictionary, use to store telemetered data
         path: use to store images
         dt: start time
@@ -132,6 +139,7 @@ def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,gbox=[-71., -
         for i in range(0,24,3): #loop every file of day, every day have 8 files
             ntime=dtime+timedelta(hours=i)
             url=get_gomofs_url(ntime)
+            print(url)
             while True:#check the internet
                 if zl.isConnected(address=url):
                     break
@@ -156,36 +164,41 @@ def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,gbox=[-71., -
                     print('reread data:'+str(url))
             if skip==1:  #if file is not exist   
                 continue
+            m_temp=temps[0,0] # JiM added this 2/19/2020
+            '''
             if i==0: 
                 count+=1
                 m_temp=temps[0,0]
             else:
                 m_temp+=temps[0,0]
                 count+=1
-        m_temp=m_temp/float(count)
-        ntime=dtime
-        time_str=ntime.strftime('%Y-%m-%d')
-        temp=m_temp*1.8+32
-        Year=str(ntime.year)
-        Month=str(ntime.month)
-        Day=str(ntime.day)
-        slons,slats=[],[]
-        try:
+            '''
+            #m_temp=m_temp/float(count)
+            #ntime=dtime
+            time_str=ntime.strftime('%Y-%m-%d-%H')
+            temp=m_temp*1.8+32
+            Year=str(ntime.year)
+            Month=str(ntime.month)
+            Day=str(ntime.day)
             slons,slats=[],[]
-            for i in telemetered_dict[Year][Month][Day].index:
-                slons.append(telemetered_dict[Year][Month][Day]['lon'].iloc[i])
-                slats.append(telemetered_dict[Year][Month][Day]['lat'].iloc[i])
-        except:
-            slons,slats=[],[]
-        plot(lons,lats,slons,slats,temp,depth,time_str,path,gbox)
+            try:
+                slons,slats=[],[]
+                for i in telemetered_dict[Year][Month][Day].index:
+                    slons.append(telemetered_dict[Year][Month][Day]['lon'].iloc[i])
+                    slats.append(telemetered_dict[Year][Month][Day]['lat'].iloc[i])
+            except:
+                slons,slats=[],[]
+            dpi=80
+            plotit(lons,lats,slons,slats,temp,depth,time_str,path,dpi,area)
                 
 def read_telemetry(path):
     """read the telemetered data and fix a standard format, the return the standard data"""
     tele_df=pd.read_csv(path,sep='\s+',names=['vessel_n','esn','month','day','Hours','minates','fracyrday',\
                                           'lon','lat','dum1','dum2','depth','rangedepth','timerange','temp','stdtemp','year'])
     if len(tele_df)<6000:
-        print('check the telemetered website!')
-        sys.exit()
+        #print('check the telemetered website!')
+        print('Warning: the emolt.dat file is not complete at this time.')
+        #sys.exit()
         
     return tele_df
 
@@ -252,24 +265,32 @@ def make_gif(gif_name,png_dir,start_time=False,end_time=False,frame_length = 0.2
             images.append(imageio.imread(file_path))
     # the duration is the time spent on each image (1/duration is frame rate)
     imageio.mimsave(gif_name, images,'GIF',duration=frame_length)
-def main():  
-    #hardcodes
-    area='OOI'
-    realpath=os.path.dirname(os.path.abspath(__file__))
-    dpath=realpath[::-1].replace('py'[::-1],'result/Gomofs/'[::-1],1)[::-1]  # the directory of the result
-    if not os.path.exists(dpath):
-        os.makedirs(dpath)
-    dictionary=os.path.join(dpath,'dictionary_emolt.p')
-    gif_path=os.path.join(dpath,'gif')
-    map_save=os.path.join(dpath,'map')
-    gif_name =os.path.join(gif_path,'2019-08Gomofs.gif')
-    
-    #############################
-    #run functions
-    seperate(filepathsave=dictionary)
-    gbox=getgbox('OOI') # gets lon and lat limits
-    make_images(dpath=dictionary,path=map_save,dt=datetime(2019,10,1,0,0,0),gbox=gbox)
-    make_gif(gif_name,map_save,start_time='2019-10-01',end_time='2019-10-10')
 
-if __name__ == "__main__":
-    main()
+#MAIN CODE
+#def main():  
+#Hardcodes#######################
+area='NorthShore'
+start_date='2020-02-11'
+ndays=3
+##################################
+start_date_datetime=datetime(int(start_date[0:4]),int(start_date[5:7]),int(start_date[8:10]),0,0,0)
+end_date_datetime=datetime(int(start_date[0:4]),int(start_date[5:7]),int(start_date[8:10]),0,0,0)+timedelta(days=ndays)
+end_date=str(end_date_datetime.year)+'-'+str(end_date_datetime.month).zfill(2)+'-'+str(end_date_datetime.day).zfill(2)
+realpath=os.path.dirname(os.path.abspath(__file__))
+dpath=realpath[::-1].replace('py'[::-1],'result/GOMOFS/'[::-1],1)[::-1]  # the directory of the result
+if not os.path.exists(dpath):
+    os.makedirs(dpath)
+dictionary=os.path.join(dpath,'dictionary_emolt.p')
+gif_path=os.path.join(dpath,'gif')
+map_save=os.path.join(dpath,'map')
+gif_name =os.path.join(gif_path,start_date+area+'_GOMOFS.gif')
+    
+#############################
+#run functions
+seperate(filepathsave=dictionary)
+gbox=getgbox(area) # gets lon and lat limits
+make_images(dpath=dictionary,path=map_save,dt=start_date_datetime,interval=ndays,area=area)
+make_gif(gif_name,map_save,start_time=start_date,end_time=end_date)
+
+#if __name__ == "__main__":
+#    main()

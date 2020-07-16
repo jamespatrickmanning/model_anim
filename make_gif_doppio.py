@@ -3,18 +3,27 @@
 
 """
 Created on Wed Apr 17 11:29:14 2019
-function:
 @author: leizhao
 Modified by JiM in Fall 2019
-See hardcoded dates in the "main()" function near the bottom
+Modified by Jim in Summer 2020 with Jack Polentes help
+See hardcodes at top of code where there is, for example, "start_date" and "ndays" 
+Note: You may need to adjust the "clevs" to get good range of colors.
+Note: You may want to adjust the Basemap resolution to "c" for crude in experiments.
 Note: You may need to "conda install -c conda-forge basemap-data-hires" in order to use the higher resolution coastlines
 """
+#hardcodes########################
+area='NorthShore'
+start_date='2020-07-09'
+clevs=[42.,52.,0.2]# min,max, and interval of temperature contour levels wanted
+ndays=1 # number of days to run
+#########
 import os,imageio
 import conda
 conda_file_dir = conda.__file__
 conda_dir = conda_file_dir.split('lib')[0]
 proj_lib = os.path.join(os.path.join(conda_dir, 'share'), 'proj')
-os.environ["PROJ_LIB"] = proj_lib
+#os.environ["PROJ_LIB"] = proj_lib NOTE: JiM had to point to specific directory
+#os.environ['PROJ_LIB'] = 'c:\\Users\\Joann\\anaconda3\\pkgs\\proj4-5.2.0-ha925a31_1\\Library\share'
 from mpl_toolkits.basemap import Basemap
 # requires netcdf4-python (netcdf4-python.googlecode.com)
 from netCDF4 import Dataset as NetCDFFile
@@ -24,6 +33,8 @@ from datetime import datetime,timedelta
 import time
 import zlconversions as zl
 import sys
+import warnings
+warnings.filterwarnings("ignore") # gets rid of warnings at runtime but you may want to comment this out to see things
 import pandas as pd
 try:
     import cPickle as pickle
@@ -59,20 +70,20 @@ def getgbox(area):
 
 
 
-def plotit(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,area='OOI'):
+def plotit(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,area='OOI',clevs=[39.,44.,0.5]):
     fig = plt.figure(figsize=(12,9))
     ax = fig.add_axes([0.01,0.05,0.98,0.87])
     # create polar stereographic Basemap instance.
     gb=getgbox(area)
     m = Basemap(projection='stere',lon_0=(gb[0]+gb[1])/2.,lat_0=(gb[2]+gb[3])/2.,lat_ts=0,llcrnrlat=gb[2],urcrnrlat=gb[3],\
-                llcrnrlon=gb[0],urcrnrlon=gb[1],rsphere=6371200.,resolution='f',area_thresh=100)# JiM changed resolution to "c" for crude
+                llcrnrlon=gb[0],urcrnrlon=gb[1],rsphere=6371200.,resolution='i',area_thresh=100)# JiM changed resolution to "c" for crude
     #m = Basemap(projection='stere',lon_0=-70.25,lat_0=40.5,lat_ts=0,llcrnrlat=37,urcrnrlat=44,\
     #            llcrnrlon=-75.5,urcrnrlon=-65,rsphere=6371200.,resolution='i',area_thresh=100)# JiM changed resolution to "c" for crude
                 #llcrnrlon=-75.5,urcrnrlon=-65,rsphere=6371200.,resolution='c',area_thresh=100)
     # draw coastlines, state and country boundaries, edge of map.
     m.drawcoastlines()
-    m.drawstates()
-    m.drawcountries()
+    #m.drawstates()
+    #m.drawcountries()
     if len(slons)!=0:
         x1,y1=m(slons,slats)
         ax.plot(x1,y1,'ro',markersize=10)
@@ -91,25 +102,26 @@ def plotit(lons,lats,slons,slats,temp,depth,time_str,path_save,dpi=80,area='OOI'
     plt.clabel(dept_cs, inline = True, fontsize =15,fmt="%1.0f")
     
     
-    clevs=np.arange(39.,47.,0.5)  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
+    clevs=np.arange(clevs[0],clevs[1],clevs[2])  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
     cs = m.contourf(x,y,temp,clevs,cmap=plt.get_cmap('rainbow'))
     # add colorbar.
     cbar = m.colorbar(cs,location='right',pad="2%",size="5%")
     cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=20)
     cbar.set_label('Fahrenheit',fontsize=25)
     # add title
-    plt.title('DOPPIO MODEL BOTTOM TEMPERATURE '+time_str,fontsize=24)
+    plt.title('DOPPIO BOTTOM TEMP '+time_str,fontsize=24)
     if not os.path.exists(path_save):
         os.makedirs(path_save)
     plt.savefig(os.path.join(path_save,time_str.replace(' ','t')+'.png'),dpi=dpi)
+    plt.close()
 
-def mean_temp(temps):
+def mean_temp(temps): #makes daily averages if needed for multi-week animations
     mean_temp=temps[0,0]
     for i in range(1,24):
         mean_temp+=temps[i,0]# note we are using the bottom level 0
     return mean_temp/24.0
         
-def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
+def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI',clevs=[39.,44.,0.5]):
     '''dpath: the path of dictionary, use to store telemetered data
         path: use to store images
         dt: start time
@@ -150,10 +162,11 @@ def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
             continue
                 
         #m_temp=mean_temp(temps)# here we are taking a daily average
-        m_temp=temps[np.mod(j,24),0]
+        m_temp=temps[j,0] # JiM made this change 7/16/2020 since we are looking at hourly not daily images
+        #m_temp=temps[np.mod(j,24),0]
         ntime=dtime
         #time_str=ntime.strftime('%Y-%m-%d')
-        time_str=ntime.strftime('%Y-%m-%d-%H')
+        time_str=ntime.strftime('%Y-%m-%d %H00UTC')
         temp=m_temp*1.8+32
         Year=str(ntime.year)
         Month=str(ntime.month)
@@ -166,7 +179,7 @@ def make_images(dpath,path,dt=datetime(2019,5,1,0,0,0),interval=31,area='OOI'):
                 slats.append(telemetered_dict[Year][Month][Day]['lat'].iloc[i])
         except:
             slons,slats=[],[]
-        plotit(lons,lats,slons,slats,temp,depth,time_str,path,dpi=80,area=area)
+        plotit(lons,lats,slons,slats,temp,depth,time_str,path,dpi=80,area=area,clevs=clevs)
         
 def read_telemetry(path):
     """read the telemetered data and fix a standard format, the return the standard data"""
@@ -242,12 +255,8 @@ def make_gif(gif_name,png_dir,start_time=False,end_time=False,frame_length = 0.2
             images.append(imageio.imread(file_path))
     # the duration is the time spent on each image (1/duration is frame rate)
     imageio.mimsave(gif_name, images,'GIF',duration=frame_length)
-#def main():  
-#hardcodes in this function!!!!!!!!!!!!
-area='NorthShore'
-start_date='2020-02-14'
-ndays=5 # number of days to run
-#########
+    
+#MAINCODE###########################
 start_date_datetime=datetime(int(start_date[0:4]),int(start_date[5:7]),int(start_date[8:10]),0,0,0)
 end_date_datetime=datetime(int(start_date[0:4]),int(start_date[5:7]),int(start_date[8:10]),0,0,0)+timedelta(days=ndays)
 end_date=str(end_date_datetime.year)+'-'+str(end_date_datetime.month).zfill(2)+'-'+str(end_date_datetime.day).zfill(2)
@@ -266,9 +275,8 @@ gif_name =os.path.join(gif_path,start_date+area+'_Doppio.gif')
 seperate(filepathsave=dictionary)
 #    make_images(dpath=dictionary,path=map_save)
 #    make_gif(gif_name,map_save)
-make_images(dpath=dictionary,path=map_save,dt=start_date_datetime,interval=ndays,area=area)
+make_images(dpath=dictionary,path=map_save,dt=start_date_datetime,interval=ndays,area=area,clevs=clevs)
 make_gif(gif_name,map_save,start_time=start_date,end_time=end_date)# sending datetimes
     
-#if __name__ == "__main__":
-#    main()
+
 

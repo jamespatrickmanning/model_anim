@@ -8,7 +8,7 @@ Modified by JiM in Summer 2020 with Jack Polentes help
 
 Modified by JiM in Fall 2020 by adding drifter tracks and, in late Oct 2020, NCEP wind vector
 
-Modified by JiM in Feb 2021 to have user select between DOPPIO,  GOMOFS, FVCOM,  ....
+Modified by JiM in Feb 2021 to have user select between DOPPIO,  GOMOFS, FVCOM w/"make_model_gif.py"
 
 Stored in Github as "model_anim" repository
 

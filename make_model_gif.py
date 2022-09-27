@@ -18,15 +18,15 @@ Note:
 """
 #hardcodes########################
 area='SNE'#'SNW'#'NorthShore'#'SNW'#'GBANK_RING'#'Gloucester'
-start_date='2022-08-21'#'2013-04-01'
+start_date='2022-09-11'#'2013-04-01'
 #clevs=[65.,80.,.5]#gb ring surf June
 clevs=[50.,72.,.5]#ns bottom June
 clevs=[52.,78.,.5]#gb ring June
 clevs=[58.,74.,.5]#SNE-W in July
-clevs=[58.,80.,.5]#SNE in August
+clevs=[60.,82.,.5]#SNE in August
 dtime=[]
 units='degF'
-ndays=2 # number of days to run
+ndays=4 # number of days to run
 detide='n'# for FVCOM hindast only now
 include_temp_obs='yes' # 'yes' overlays positions of observed bottom temps
 include_temp_obs_LFA='no' # 'yes' overlays LFA positions of observed bottom temp
@@ -73,7 +73,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 def getgbox(area):
   # gets geographic box based on area
   if area=='SNE':
-    gbox=[-72.,-66.,39.,42.] # for SNE shelf east
+    gbox=[-73.,-68.,38.,41.4] # for SNE shelf east
   elif area=='SNW':
     gbox=[-71.5,-69.5,40.,41.75] # for SNw shelf west
   elif area=='MABN':
@@ -340,12 +340,14 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
         df1=df1[df1['datet']<dtthis]# only the track less than this time
         df1=df1[df1['datet']>dtthis-timedelta(2.0)]
         #make a plot for this hour and every hour previous with decreasing thickness
-        if k==226400691:
-            print(len(df1))
+        if k==228400691:
+            c='m'
+        else:
+            c='c'
         for kk in range(len(df1)-1):
             x1,y1=m(df1['LON'].values[kk],df1['LAT'].values[kk])
             x2,y2=m(df1['LON'].values[kk+1],df1['LAT'].values[kk+1])
-            m.plot([x1,x2],[y1,y2],'m',linewidth=kk/(len(df1)/4))#markersize=kk)#,linewidth=kk)
+            m.plot([x1,x2],[y1,y2],color=c,linewidth=kk/(len(df1)/4))#markersize=kk)#,linewidth=kk)
     if include_weather_balloon=='yes':
         # add weather balloon track    
         dfwb=pd.read_csv('ActivityReport.csv',skiprows=4)    
@@ -371,10 +373,13 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
         layer='surface'
     #plt.title(model+' '+layer+' temps (color),'+clayer+'current (black) & depth (m)',fontsize=12,fontweight='bold')
     #plt.title('eMOLT bottom temps (white#s) '+model+' '+layer+' temps (color) '+clayer+' & depth (meters)',fontsize=12,fontweight='bold')
-    plt.title('eMOLT bottom temps (white#s) '+model+' '+layer+' temps (color) '+clayer+' depth(meters) & drifter (purple)',fontsize=12,fontweight='bold')
+    plt.title('eMOLT bottom temps (white#s) '+model+' '+layer+' temps (color) '+clayer+' depth(meters) & drifter (purple&cyan)',fontsize=12,fontweight='bold')
     if detide=='y':
         time_str=time_str[0:10]
-    plt.suptitle('OOI obs & '+model+' at '+time_str, fontsize=24) 
+    if include_ooi=='yes':
+        plt.suptitle('OOI obs & '+model+' at '+time_str, fontsize=24)
+    else:
+        plt.suptitle(model+' at '+time_str, fontsize=24)
     if not os.path.exists(path_save):
         os.makedirs(path_save)
     plt.savefig(os.path.join(path_save,time_str.replace(' ','t')+'.png'),dpi=dpi)

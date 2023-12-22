@@ -17,27 +17,32 @@ Note: You may need to "conda install -c conda-forge basemap-data-hires" in order
 Note: 
 """
 #hardcodes########################
-area='SNE'#'SNW'#'NorthShore'#'SNW'#'GBANK_RING'#'Gloucester'
-start_date='2022-09-11'#'2013-04-01'
+#area='NEC'#'SNW'#'NorthShore'#'SNW'#'GBANK_RING'#'Gloucester'
+area='inside_CCBAY'
+start_date='2023-12-19'#'2013-04-01'
 #clevs=[65.,80.,.5]#gb ring surf June
 clevs=[50.,72.,.5]#ns bottom June
 clevs=[52.,78.,.5]#gb ring June
 clevs=[58.,74.,.5]#SNE-W in July
-clevs=[60.,82.,.5]#SNE in August
+clevs=[58.,80.,.5]#SNE in August
+#clevs=[56.,75.,.5]#NEC in December
+clevs=[43.,52.,.2]#CCBay in Dec
+#clevs=[43.,50.,.2]#CCBay in late Dec
 dtime=[]
 units='degF'
-ndays=4 # number of days to run
+ndays=2 # number of days to run
 detide='n'# for FVCOM hindast only now
 include_temp_obs='yes' # 'yes' overlays positions of observed bottom temps
 include_temp_obs_LFA='no' # 'yes' overlays LFA positions of observed bottom temp
-include_wind='no'
-include_ooi='yes'
+include_wind='yes'
+include_ooi='no'
 include_weather_balloon='no'
+include_miniboats='no'
 #cluster='ep_2022_1' # code of drifter cluster to include
-cluster='shp_2022_1'
-surf_or_bot=-1#0 for most but -1 for surface (opposite for FVCOM)
-lat_w,lon_w=40.,-68.5 # base of wind vector legend (actual vector appears mid plot)
-model='DOPPIO'#'DOPPIO'# FVCOM, DOPPIO, or GOMOFS ...
+cluster='fhs_2023_2'
+surf_or_bot=0#0 for most but -1 for surface (opposite for FVCOM)
+lat_w,lon_w=41.5,-70.5 # base of wind vector legend (actual vector appears mid plot)
+model='FVCOM'#'DOPPIO'# FVCOM, DOPPIO, or GOMOFS ...
 #########
 import os,imageio
 import conda
@@ -47,7 +52,10 @@ conda_file_dir = conda.__file__
 conda_dir = conda_file_dir.split('lib')[0]
 proj_lib = os.path.join(os.path.join(conda_dir, 'share'), 'proj')
 #os.environ['PROJ_LIB'] = 'c:\\Users\\Joann\\anaconda3\\pkgs\\proj4-5.2.0-ha925a31_1\\Library\share'
-os.environ['PROJ_LIB'] = 'C:\\Users\\james.manning\\Anaconda3\\pkgs\\proj-7.1.0-h7d85306_1\\Library\share'
+#os.environ['PROJ_LIB'] = 'C:\\Users\\james.manning\\Anaconda3\\pkgs\\proj-7.1.0-h7d85306_1\\Library\share'
+os.environ['PROJ_LIB'] = '/home/user/anaconda3/pkgs/proj-8.2.1-h277dcde_0/share'
+#conda install -c conda-forge basemap (to get basemap on my Linux machine in Nov 2022)
+
 from mpl_toolkits.basemap import Basemap
 # requires netcdf4-python (netcdf4-python.googlecode.com)
 from netCDF4 import Dataset as NetCDFFile
@@ -56,7 +64,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime,timedelta
 import time
 import zlconversions as zl
-import gomofs_modules
+#import gomofs_modules
 import sys
 import warnings
 warnings.filterwarnings("ignore") # gets rid of warnings at runtime but you may want to comment this out to see things
@@ -73,7 +81,7 @@ ssl._create_default_https_context = ssl._create_unverified_context
 def getgbox(area):
   # gets geographic box based on area
   if area=='SNE':
-    gbox=[-73.,-68.,38.,41.4] # for SNE shelf east
+    gbox=[-71.,-67.,39.5,42.] # for SNE shelf east
   elif area=='SNW':
     gbox=[-71.5,-69.5,40.,41.75] # for SNw shelf west
   elif area=='MABN':
@@ -97,66 +105,34 @@ def getgbox(area):
   elif area=='inside_CCBAY':
     gbox=[-70.75,-70.,41.7,42.15] # inside CCBAY
   elif area=='NEC':
-    gbox=[-69.,-64.,39.,43.5] # NE Channel
+    gbox=[-68.,-63.,38.,43.5] # NE Channel
   elif area=='NE':
     gbox=[-76.,-66.,35.,44.5] # NE Shelf 
   return gbox
 
-
-#def get_wind_ncep(starttime,endtime,lat,lon):
-def get_wind_ncep(year,lat,lon):    
-        #function get a time series of u & v wind m/s from pre-downloaded ncep file
-        #Note: there is a new version of this function inside "jamespatrickmanning/stick_plot" github repository in get_stick_plot.py
-        url_input=""
-        url_uwind=url_input+'uwnd.sig995.'+str(year)+'.nc'## where I downloaded these from ftp://ftp.cdc.noaa.gov/Datasets/ncep.reanalysis/surface/
-        url_vwind=url_input+'vwnd.sig995.'+str(year)+'.nc'
-        #print(url_vwind)
-        ncv=netCDF4.Dataset(url_vwind)
-        ncu=netCDF4.Dataset(url_uwind)
-        
-        t=ncv.variables['time'][:]
-        u_wind=ncu.variables['uwnd']
-        v_wind=ncv.variables['vwnd']
-        
-        LAT=ncu.variables['lat'][:]
-        LON=ncu.variables['lon'][:]
-        
-        for i in range(len(LON)):#transfer lon from (0,360) to (-180.180)
-            if(LON[i]>180):
-                LON[i]=-360+LON[i]
-        ###########find index of nearest point###########
-        index=[]
-        d=[]
-        for a in np.arange(len(LAT)):
-            d1=[]
-            for b in np.arange(len(LON)):
-                d2=sqrt((LAT[a]-lat)*(LAT[a]-lat)+(LON[b]-lon)*(LON[b]-lon))
-                d1.append(d2)
-            d.append(d1) 
-        #print(np.argmin(d)/len(LON), np.argmin(d)%len(LON),np.hstack(d)[np.argmin(d)],d[np.argmin(d)/len(LON)][np.argmin(d)%len(LON)]
-        index.append(np.argmin(d)/len(LON))#index of LAT
-        index.append(np.argmin(d)%len(LON))#index of LON
-        #print(index
-        cptime="%i,01,01,00,00"  %year
-        cptimes=datetime.strptime(cptime, '%Y,%m,%d,%H,%M')
-        moddate=[]
-        for k in range(len(t)):
-            moddate.append(cptimes+timedelta(hours=t[k]-t[0]))
-        du= u_wind[:,index[0],index[1]].tolist()
-        dv= v_wind[:,index[0],index[1]].tolist()
-        du=list(map(float,du))
-        dv=list(map(float,dv))
-        df_w=pd.DataFrame([moddate,du,dv])
-        #df_w=pd.DataFrame([moddate,u_wind[:,index[0],index[1]].tolist(),v_wind[:,index[0],index[1]].tolist()])  
-        df_w=df_w.T.set_index(0) # takes teh transpose and then makes datetime column the index
-        df_w.columns=['u','v']
-        dfu=pd.to_numeric(df_w.u)
-        dfuh=dfu.resample('H').mean().interpolate('linear') 
-        dfv=pd.to_numeric(df_w.v)
-        dfvh=dfv.resample('H').mean().interpolate('linear')
-        df_wf=pd.concat([dfuh,dfvh],axis=1)
-        # make it hourly
-        return df_wf
+def get_wind_ncep_2(starttime,endtime,lat,lon): # added Sep 2023
+    #function get a time series of u & v wind m/s from ncep 
+    #added option for both reanalysis (historical) and forecast in Dec 2023
+    st=starttime.strftime('%Y-%m-%dT%H:%M:%SZ')
+    et=endtime.strftime('%Y-%m-%dT%H:%M:%SZ')
+    print('extracting wind time series from CoastWatch erddap...')
+    if starttime<=datetime.now()-timedelta(days=3):# get reanalysis
+        #expects times to be datetimes and lon to be degrees east (~290)
+        url='https://coastwatch.pfeg.noaa.gov/erddap/griddap/esrlNcepRe.csvp?uwnd%5B('+st+'):1:('+et+')%5D%5B('+str(lat)+'):1:('+str(lat)+')%5D%5B('+str(360+lon)+'):1:('+str(360+lon)+')%5D,vwnd%5B('+st+'):1:('+et+')%5D%5B('+str(lat)+'):1:('+str(lat)+')%5D%5B('+str(360+lon)+'):1:('+str(360+lon)+')%5D'
+        df=pd.read_csv(url)       
+        t=pd.to_datetime(df['time (UTC)'],format='%Y-%m-%dT%H:%M:%S').values
+        u_wind=df['uwnd (m/s)'].values
+        v_wind=df['vwnd (m/s)'].values
+        df_w=pd.DataFrame([t,u_wind,v_wind])
+    else: # get GFS forecast gets 42N and 71W
+        df=pd.read_csv('https://coastwatch.pfeg.noaa.gov/erddap/griddap/NCEP_Global_Best.csvp?ugrd10m%5B('+st+'):1:('+et+')%5D%5B(42.0):1:(42.0)%5D%5B(289.0):1:(289.0)%5D,vgrd10m%5B('+st+'):1:('+et+')%5D%5B(42.0):1:(42.0)%5D%5B(289.0):1:(289.0)%5D')
+        t=pd.to_datetime(df['time (UTC)'],format='%Y-%m-%dT%H:%M:%S').values
+        u_wind=df['ugrd10m (m s-1)'].values
+        v_wind=df['vgrd10m (m s-1)'].values
+        df_w=pd.DataFrame([t,u_wind,v_wind])
+    print('got wind!')    
+    return df_w
+    
 
 def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area='OOI',clevs=[39.,44.,0.5],lat_w=42.5,lon_w=-70.5,wind=pd.DataFrame([[datetime.now()-timedelta(1),datetime.now()],[.1,.1],[.1,.1]]),ooi=pd.DataFrame([[datetime.now()-timedelta(1),datetime.now()],[.1,.1],[.1,.1]]),dtime=dtime,model='DOPPIO',detide='n',ooiw=pd.DataFrame([[datetime.now()-timedelta(1),datetime.now()],[.1,.1],[.1,.1]])):
     '''dtimes,u,v are wind in m/s'''
@@ -175,11 +151,13 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
     m.drawcoastlines()
     m.fillcontinents(color='gray',zorder=3)
     if include_wind=='yes':
-       xw,yw=m(lon_w,lat_w)  
-       ax.quiver(xw,yw,10.0,0.0,color='red',scale=50.,zorder=2)#wind legend in middle
-       ax.text(xw,yw+(m.ymin+m.ymax)/20,'10 m/s (~20 knots) NCEP wind',fontsize=16,color='red',zorder=2) 
+       xw,yw=m(lon_w,lat_w) 
+       ax.quiver(xw,yw,10.0,0.0,color='red',scale=50.,zorder=0)#wind legend in middle
+       ax.text(xw,yw+(m.ymax-m.ymin)/20,'10 m/s (~20 knots) NCEP wind',fontsize=16,color='teal',zorder=0)
+       wind=wind.T
+       wind=wind.set_index(0)
        idex=wind.index.get_loc(datetime.strptime(time_str[0:15],"%Y-%m-%d %H%M"),method='nearest')
-       ax.quiver((m.xmin+m.xmax)/2,(m.ymin+m.ymax)/2,wind.u[idex],wind.v[idex],scale=50.0,color='red',zorder=2) # plot an arrow
+       ax.quiver((m.xmin+m.xmax)/2,(m.ymin+m.ymax)/2,wind[1][idex],wind[2][idex],scale=50.0,color='teal',zorder=2) # plot an arrow
     if include_ooi=='yes':
        #xo,yo=m(-70.77,39.943)  
        xo,yo=m(-70.78,40.13)
@@ -224,14 +202,20 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
         dept_clevs=[50,100,150]
         x,y=m(-68.3,40.65)    
         plt.text(x,y,' Georges Bank',fontsize=16, rotation=30) 
+    elif (area=='inside_CCBAY'):
+        labint=.2
+        dept_clevs=[30,50,100,150]
+        x,y=m(-70.32,41.84)    
+        plt.plot(x,y,'o',color='k',markersize=10)
+        plt.text(x,y,'  mooring',fontsize=12)#, rotation=30)
     else:
         labint=1.0
         dept_clevs=[30,50,100, 150,300,1000]
     parallels = np.arange(0.,90,labint)
-    m.drawparallels(parallels,labels=[1,0,0,0],fontsize=20)
+    m.drawparallels(parallels,labels=[1,0,0,0],fontsize=16)
     # draw meridians
     meridians = np.arange(180.,360.,labint)
-    m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=20)
+    m.drawmeridians(meridians,labels=[0,0,0,1],fontsize=16)
     x, y = m(lons, lats) # compute map proj coordinates.
     dtthis=datetime(int(time_str[0:4]),int(time_str[5:7]),int(time_str[8:10]),int(time_str[11:13]),int(time_str[13:15]))
     clevs=np.arange(clevs[0],clevs[1],clevs[2])  #for all year:np.arange(34,84,1) or np.arange(34,68,1)
@@ -240,7 +224,7 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
             cs = m.contourf(x,y,temp,clevs,cmap=plt.get_cmap('rainbow'))
             # draw depth contours.
             dept_cs=m.contour(x,y,depth,dept_clevs,colors='black')
-            plt.clabel(dept_cs, inline = True, fontsize =15,fmt="%1.0f")
+            plt.clabel(dept_cs, inline = True, fontsize =12,fmt="%1.0f")
 
     elif model=='FVCOM':
             if dtthis<datetime(2020,6,1,0,0,0):
@@ -250,10 +234,12 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
                     url='http://www.smast.umassd.edu:8080/thredds/dodsC/fvcom/hindcasts/30yr_gom3'
             elif dtthis>datetime.now()-timedelta(days=2):    
                 url = 'http://www.smast.umassd.edu:8080/thredds/dodsC/FVCOM/NECOFS/Forecasts/NECOFS_GOM3_FORECAST.nc'
+                url = 'http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_GOM7_FORECAST.nc'
             else:
-                print('FVCOM not available for this date/time.')
+                url='http://www.smast.umassd.edu:8080/thredds/dodsC/models/fvcom/NECOFS/Forecasts/NECOFS_FVCOM_OCEAN_NORTHEAST_FORECAST.nc'
+                #print('FVCOM not available for this date/time.')
             #else:
-            	
+            #print(dtthis)	
             nc = netCDF4.Dataset(url).variables
             time_var = nc['time']
             #itime = netCDF4.date2index(dtime,time_var,select='nearest')
@@ -306,30 +292,31 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
             ui=gd((xc,yc),u,(xi,yi),method='linear')
             vi=gd((xc,yc),v,(xi,yi),method='linear')
             cs=m.contourf(xi,yi,zi,clevs,cmap=plt.get_cmap('rainbow'),zorder=0)
-            plt.quiver(xi,yi,ui,vi,scale=20)
+            plt.quiver(xi,yi,ui,vi,scale=30)
             #plt.quiver(xi[::100],yi[::100],ui[::100],vi[::100],scale=10)
             #strm=plt.streamplot(xi,yi,ui,vi,density=1,color=np.sqrt(ui*ui+vi*vi),cmap='GnBu',arrowsize=2,zorder=2)
             zid=gd((x,y),depth,(xi,yi),method='linear')
-            #dept_cs=m.contour(xi,yi,zid,dept_clevs,colors='black',zorder=1)
-            plt.tricontour(x,y,depth,[200.],colors='purple')
-            #plt.clabel(dept_cs, inline = True, fontsize =15,fmt="%1.0f")
+            dept_cs=m.contour(xi,yi,zid,dept_clevs,colors='black',zorder=1)
+            #plt.tricontour(x,y,depth,[30.],colors='purple',zorder=1)
+            plt.clabel(dept_cs, inline = True, fontsize =12,fmt="%1.0f")
     
 
     # add colorbar.
     cbar = m.colorbar(cs,location='right',pad="2%",size="5%")
-    cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=20)
+    #cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=20)
     cbar.set_label(units,fontsize=25)
 
-    #df=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_'+cluster+'.csv')
+    df=pd.read_csv('/home/user/drift/drift_'+cluster+'.csv')
     #df1=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_ep_2022_1_ap3.csv')
     #df2=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_wms_2022_1.csv')
-    df1=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_rlsa_2022_1.csv')
+    #df1=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_rlsa_2022_1.csv')
     #df2=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_shp_2022_1.csv')
-    df2=pd.read_csv('drift_shp_2022_1.csv') # had to make a local one with same header
+    #df2=pd.read_csv('drift_shp_2022_1.csv') # had to make a local one with same header
     #df2=pd.read_csv('http://apps-nefsc.fisheries.noaa.gov/drifter/drift_ep_2022_1_ap3.csv')
-    df=pd.concat([df1,df2],axis=0)
-    ids=np.unique(df['ID'])
     
+    #df=pd.concat([df1,df2],axis=0)
+    ids=np.unique(df['ID'])
+    #print(ids)
     for k in ids:
         #print(k)
         datett=[]
@@ -340,14 +327,27 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
         df1=df1[df1['datet']<dtthis]# only the track less than this time
         df1=df1[df1['datet']>dtthis-timedelta(2.0)]
         #make a plot for this hour and every hour previous with decreasing thickness
-        if k==228400691:
-            c='m'
-        else:
-            c='c'
+        if k==226400691:
+            print(len(df1))
         for kk in range(len(df1)-1):
             x1,y1=m(df1['LON'].values[kk],df1['LAT'].values[kk])
             x2,y2=m(df1['LON'].values[kk+1],df1['LAT'].values[kk+1])
-            m.plot([x1,x2],[y1,y2],color=c,linewidth=kk/(len(df1)/4))#markersize=kk)#,linewidth=kk)
+            m.plot([x1,x2],[y1,y2],'m',linewidth=kk/(len(df1)/4))#markersize=kk)#,linewidth=kk)
+    
+    #if sys.argv[1]=='drift_whs_2022_1': # here is where we are adding miniboat track from Cassie
+    #include_miniboats='yes'
+    df=pd.read_csv('https://educationalpassages.org/wp-content/uploads/csv/LadyLance_1.csv')
+    df1=pd.DataFrame()
+    df1['datet']=pd.to_datetime(df['moment_date'])
+    df1['LON']=df['longitude']
+    df1['LAT']=df['latitude']
+    df1=df1[df1['datet']<dtthis]# only the track less than this time
+    df1=df1[df1['datet']>dtthis-timedelta(2.0)]
+    for kk in range(len(df1)-1):
+            x1,y1=m(df1['LON'].values[kk],df1['LAT'].values[kk])
+            x2,y2=m(df1['LON'].values[kk+1],df1['LAT'].values[kk+1])
+            m.plot([x1,x2],[y1,y2],'w',linewidth=kk/(len(df1)/4))#markersize=kk)#,linewidth=kk)
+
     if include_weather_balloon=='yes':
         # add weather balloon track    
         dfwb=pd.read_csv('ActivityReport.csv',skiprows=4)    
@@ -373,13 +373,12 @@ def plotit(lons,lats,slons,slats,stemp,temp,depth,time_str,path_save,dpi=80,area
         layer='surface'
     #plt.title(model+' '+layer+' temps (color),'+clayer+'current (black) & depth (m)',fontsize=12,fontweight='bold')
     #plt.title('eMOLT bottom temps (white#s) '+model+' '+layer+' temps (color) '+clayer+' & depth (meters)',fontsize=12,fontweight='bold')
-    plt.title('eMOLT bottom temps (white#s) '+model+' '+layer+' temps (color) '+clayer+' depth(meters) & drifter (purple&cyan)',fontsize=12,fontweight='bold')
+    #plt.title('eMOLT temps (white#s), '+model+' '+layer+' temps (color) '+clayer+', depth(meters), drifter (purple), miniboat (white)',fontsize=10,fontweight='bold')
+    plt.title('drifters (purple), '+model+' '+layer+', model temp (color) & current (black) '+clayer+', NCEP daily wind (teal arrow), depth (m) ',fontsize=10,fontweight='bold')
     if detide=='y':
         time_str=time_str[0:10]
-    if include_ooi=='yes':
-        plt.suptitle('OOI obs & '+model+' at '+time_str, fontsize=24)
-    else:
-        plt.suptitle(model+' at '+time_str, fontsize=24)
+    #plt.suptitle(model+' at '+time_str, fontsize=24) 
+    plt.suptitle(time_str, fontsize=24) 
     if not os.path.exists(path_save):
         os.makedirs(path_save)
     plt.savefig(os.path.join(path_save,time_str.replace(' ','t')+'.png'),dpi=dpi)
@@ -547,7 +546,7 @@ def make_gif(gif_name,png_dir,start_time=False,end_time=False,frame_length = 0.2
     if not os.path.exists(os.path.dirname(gif_name)):
         os.makedirs(os.path.dirname(gif_name))
     allfile_list = glob.glob(os.path.join(png_dir,'*.png')) # Get all the pngs in the current directory
-    print(allfile_list)
+    #print(allfile_list)
     file_list=[]
     if start_time:    
         for file in allfile_list:
@@ -555,7 +554,9 @@ def make_gif(gif_name,png_dir,start_time=False,end_time=False,frame_length = 0.2
                 file_list.append(file)
     else:
         file_list=allfile_list
-    list.sort(file_list, key=lambda x: x.split('/')[-1].split('t')[0]) # Sort the images by time, this may need to be tweaked for your use case
+    #list.sort(file_list, key=lambda x: x.split('/')[-1].split('t')[0]) # Sort the images by time, this may need to be tweaked for your use case
+    file_list.sort()
+    print(file_list)
     images=[]
     # loop through files, join them to image array, and write to GIF called 'wind_turbine_dist.gif'
     for ii in range(0,len(file_list)):       
@@ -581,7 +582,8 @@ gif_path=os.path.join(dpath,'gif')
 map_save=os.path.join(dpath,'map')
 gif_name =os.path.join(gif_path,start_date+area+'_'+model+'_'+str(surf_or_bot)+'.gif')
 if include_wind=='yes': # get wind time series at one location
-    df_w=get_wind_ncep(int(start_date[0:4]),lat_w,lon_w)# returns a dataframe of wind
+    #df_w=get_wind_ncep(int(start_date[0:4]),lat_w,lon_w)# returns a dataframe of wind
+    df_w=get_wind_ncep_2(start_date_datetime,end_date_datetime,lat_w,lon_w)# returns a dataframe of wind
 else:
     df_w=np.nan
 if include_ooi=='yes':
